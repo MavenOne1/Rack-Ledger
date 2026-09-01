@@ -1,0 +1,1265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rack Ledger</title>
+<meta name="description" content="Track pallets stored in warehouse rack bins.">
+<meta name="theme-color" content="#1B2430">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rack Ledger">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1B2430;
+  --ink-2:#2C3A49;
+  --steel:#5D6B78;
+  --paper:#F1F3F2;
+  --card:#FFFFFF;
+  --line:#C9D1D6;
+  --line-soft:#E3E8EA;
+  --safety:#F2B705;
+  --safety-deep:#C79300;
+  --good:#2F7D5D;
+  --alert:#B3402F;
+  --radius:4px;
+  --shadow:0 1px 0 rgba(27,36,48,.08), 0 2px 10px rgba(27,36,48,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px;
+  line-height:1.45;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3,.cond{font-family:"Barlow Condensed",Inter,sans-serif;font-weight:600;letter-spacing:.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--safety);outline-offset:2px}
+
+/* ---------- header ---------- */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  background:var(--ink);
+  color:#fff;
+  border-bottom:3px solid var(--safety);
+}
+.topbar-inner{max-width:1180px;margin:0 auto;padding:10px 14px;display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:baseline;gap:9px;min-width:0}
+.brand h1{font-size:26px;margin:0;line-height:1;letter-spacing:.02em}
+.brand .site{font-size:12px;color:#A9B6C0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.counts{margin-left:auto;display:flex;gap:14px;text-align:right}
+.counts div{line-height:1.05}
+.counts b{font-family:"Barlow Condensed",sans-serif;font-size:22px;display:block}
+.counts span{font-size:10.5px;color:#A9B6C0}
+
+.searchwrap{max-width:1180px;margin:0 auto;padding:0 14px 10px;display:flex;gap:8px}
+.searchwrap input{
+  flex:1;min-width:0;background:#141B24;border:1px solid #3A4856;color:#fff;
+  padding:11px 12px;border-radius:var(--radius);
+}
+.searchwrap input::placeholder{color:#7C8B98}
+.btn-clear{background:#3A4856;border:0;color:#fff;padding:0 14px;border-radius:var(--radius)}
+
+/* ---------- tabs ---------- */
+.tabs{position:sticky;top:0;z-index:35;background:var(--card);border-bottom:1px solid var(--line);}
+.tabs-inner{max-width:1180px;margin:0 auto;display:flex}
+.tab{
+  flex:1;background:none;border:0;border-bottom:3px solid transparent;
+  padding:13px 4px 10px;font-family:"Barlow Condensed",sans-serif;font-size:19px;color:var(--steel);
+}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--safety)}
+
+main{max-width:1180px;margin:0 auto;padding:16px 14px 90px}
+.view[hidden]{display:none}
+.notice{
+  background:#FFF6D9;border:1px solid #E8CE7A;border-left:5px solid var(--safety);
+  padding:10px 12px;border-radius:var(--radius);font-size:13.5px;margin-bottom:14px
+}
+.notice b{font-weight:600}
+
+/* ---------- rack chart ---------- */
+.chart-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.chart-head h2{margin:0;font-size:23px}
+.chart-head p{margin:0;color:var(--steel);font-size:13px}
+.tools{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn{
+  background:var(--ink);color:#fff;border:0;padding:10px 14px;border-radius:var(--radius);
+  font-family:"Barlow Condensed",sans-serif;font-size:17px
+}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.safety{background:var(--safety);color:#241B00}
+.btn.danger{background:var(--alert);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:16px;font-size:12.5px;color:var(--ink-2)}
+.legend span{display:flex;align-items:center;gap:6px}
+.swatch{width:13px;height:13px;border-radius:2px;display:inline-block;border:1px solid rgba(0,0,0,.15)}
+
+.aisle{margin-bottom:26px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.aisle-head{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line-soft);
+  background:linear-gradient(var(--card),#F6F8F8)
+}
+.aisle-head h3{margin:0;font-size:21px}
+.aisle-head .meta{margin-left:auto;font-size:12px;color:var(--steel)}
+.rack-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.rack{border-collapse:separate;border-spacing:0;width:100%;min-width:max-content}
+table.rack th.bay{
+  font-family:"Barlow Condensed",sans-serif;font-weight:500;font-size:13px;color:var(--steel);
+  padding:6px 4px;border-bottom:1px solid var(--line-soft);font-variant-numeric:tabular-nums
+}
+table.rack th.lvl{
+  position:sticky;left:0;z-index:2;background:var(--card);
+  font-family:"Barlow Condensed",sans-serif;font-size:13px;color:var(--steel);font-weight:500;
+  padding:4px 8px;border-right:1px solid var(--line-soft);white-space:nowrap;text-align:right
+}
+table.rack td{padding:3px}
+.bin{
+  width:118px;min-height:62px;display:block;text-align:left;
+  background:#FBFCFC;border:1px solid var(--line-soft);border-left:5px solid var(--line);
+  border-radius:3px;padding:5px 7px;line-height:1.2;
+}
+.bin .code{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:500;color:var(--steel);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.bin.filled{background:var(--card);border-color:var(--line);box-shadow:inset 0 -1px 0 rgba(27,36,48,.05)}
+.bin.filled .code{color:var(--ink-2)}
+.bin .entry{display:block}
+.bin .entry.extra{display:none}
+.bin .job{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;display:block;margin-top:1px;word-break:break-all}
+.bin .desc{font-size:10.5px;color:var(--steel);display:block;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bin .more{font-size:10px;color:var(--safety-deep);font-weight:600}
+.bin.hit{outline:3px solid var(--safety);outline-offset:1px}
+.bin.dim{opacity:.32}
+.floorline{height:5px;background:repeating-linear-gradient(45deg,#E3E8EA,#E3E8EA 6px,#F1F3F2 6px,#F1F3F2 12px);border-top:1px solid var(--line-soft)}
+
+/* ---------- forms ---------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:18px}
+.panel h2{margin:0 0 3px;font-size:22px}
+.panel .sub{margin:0 0 16px;color:var(--steel);font-size:13.5px}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:5px;font-weight:500}
+.field input,.field select,.field textarea{
+  width:100%;padding:12px;border:1px solid var(--line);border-radius:var(--radius);background:#fff
+}
+.field textarea{min-height:64px;resize:vertical}
+.row{display:flex;gap:11px}
+.row>*{flex:1;min-width:0}
+.hint{font-size:12px;color:var(--steel);margin-top:5px}
+.actions{display:flex;gap:9px;margin-top:6px;flex-wrap:wrap}
+.actions .btn{flex:1;min-width:130px;padding:13px}
+.binpick{display:flex;gap:8px;align-items:stretch}
+.binpick select{flex:1}
+.binpick button{white-space:nowrap;padding:0 12px}
+.msg{padding:11px 12px;border-radius:var(--radius);font-size:14px;margin-bottom:14px;display:none}
+.msg.show{display:block}
+.msg.ok{background:#E4F1EA;border:1px solid #A9CDBB;color:#1D5B42}
+.msg.err{background:#FBE7E3;border:1px solid #E3B2A9;color:#8A2F22}
+
+/* ---------- inventory list ---------- */
+.filterbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}
+.filterbar select{padding:10px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;flex:1;min-width:140px}
+.item{
+  background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);
+  border-radius:var(--radius);padding:11px 13px;margin-bottom:9px;display:flex;gap:12px;align-items:flex-start
+}
+.item .main{flex:1;min-width:0}
+.item .jobline{font-family:"Barlow Condensed",sans-serif;font-size:21px;line-height:1.1}
+.item .jobline .ship{color:var(--steel);font-size:15px;margin-left:7px}
+.item .sub2{font-size:13px;color:var(--ink-2);margin-top:2px}
+.item .meta2{font-size:11.5px;color:var(--steel);margin-top:3px}
+.item .binbadge{
+  font-family:"Barlow Condensed",sans-serif;font-size:19px;background:var(--ink);color:#fff;
+  padding:4px 9px;border-radius:3px;white-space:nowrap;font-variant-numeric:tabular-nums
+}
+.item.shipped{opacity:.62}
+.item.shipped .binbadge{background:var(--steel)}
+.empty{text-align:center;padding:38px 16px;color:var(--steel)}
+.empty p{margin:0 0 14px}
+
+/* ---------- modal ---------- */
+dialog{
+  border:0;border-radius:6px;padding:0;width:min(520px,94vw);
+  box-shadow:0 18px 50px rgba(27,36,48,.3);color:var(--ink)
+}
+dialog::backdrop{background:rgba(27,36,48,.55)}
+.dlg-head{background:var(--ink);color:#fff;padding:13px 16px;display:flex;align-items:center;gap:10px}
+.dlg-head h3{margin:0;font-size:23px}
+.dlg-head .x{margin-left:auto;background:none;border:0;color:#A9B6C0;font-size:26px;line-height:1;padding:0 4px}
+.dlg-body{padding:16px;max-height:64vh;overflow:auto}
+.dlg-item{border:1px solid var(--line-soft);border-left:5px solid var(--line);border-radius:3px;padding:11px;margin-bottom:11px}
+.dlg-item .t{font-family:"Barlow Condensed",sans-serif;font-size:20px}
+.dlg-item .d{font-size:13px;color:var(--ink-2)}
+.dlg-item .m{font-size:11.5px;color:var(--steel);margin-top:3px}
+.dlg-item .acts{display:flex;gap:7px;margin-top:9px}
+.dlg-item .acts button{flex:1;padding:8px;font-size:15px}
+.confirm{margin-top:10px;padding:10px;background:#F6F8F8;border:1px solid var(--line-soft);border-radius:3px}
+.confirm p{margin:0 0 9px;font-size:13px;color:var(--ink-2)}
+.confirm .movelabel{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:5px;font-weight:500}
+.confirm select{width:100%;padding:11px;border:1px solid var(--line);border-radius:var(--radius);background:#fff}
+.confirm .acts{margin-top:9px}
+
+/* ---------- floor zones ---------- */
+.floorzone .aisle-head h3{font-size:21px}
+.floorbtn{
+  display:block;width:100%;text-align:left;background:none;border:0;
+  padding:10px 12px;font:inherit;color:inherit
+}
+.floorempty{display:block;color:var(--steel);font-size:13.5px;padding:6px 0}
+.floorrow{
+  display:block;border-left:5px solid var(--line);background:#FBFCFC;
+  border:1px solid var(--line-soft);border-left-width:5px;border-radius:3px;
+  padding:7px 10px;margin-bottom:7px
+}
+.floorrow:last-child{margin-bottom:0}
+.floorrow .job{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;display:block;line-height:1.1}
+.floorrow .desc{font-size:12px;color:var(--steel);display:block}
+.floorbtn.hit{outline:3px solid var(--safety);outline-offset:-2px}
+.floorbtn.dim{opacity:.32}
+
+/* ---------- area editor ---------- */
+.arow{border:1px solid var(--line-soft);border-radius:var(--radius);padding:12px;margin-bottom:11px;background:#FAFBFB}
+.arow-head{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.atype{
+  font-family:"Barlow Condensed",sans-serif;font-size:15px;background:var(--ink);color:#fff;
+  padding:2px 9px;border-radius:3px
+}
+.atype.floor{background:var(--steel)}
+.linkbtn{margin-left:auto;background:none;border:0;color:var(--alert);font-size:13px;padding:4px}
+.arow .field{margin-bottom:0}
+.arow .hint{margin-top:8px}
+
+/* ---------- printed sheet ---------- */
+#printList{display:none}
+.parea{margin-bottom:16px}
+.parea h3{display:flex;align-items:baseline;gap:9px;margin:0 0 5px;font-size:15pt;border-bottom:1.5pt solid #000;padding-bottom:2px}
+.parea h3 .pcount{margin-left:auto;font-family:Inter,sans-serif;font-size:8.5pt;font-weight:400;color:#444}
+.ptable{width:100%;border-collapse:collapse;font-size:9.5pt}
+.ptable th{
+  text-align:left;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:8.5pt;
+  border-bottom:.5pt solid #666;padding:2px 5px;color:#333
+}
+.ptable td{padding:2px 5px;vertical-align:top;line-height:1.25}
+.ptable .bincol{width:56px}
+.ptable .bincell{
+  font-family:"Barlow Condensed",sans-serif;font-size:13pt;font-weight:600;
+  border-left:2.5pt solid #000;padding-top:3px
+}
+.ptable .jobcell{font-weight:600;white-space:nowrap}
+.ptable .num{text-align:right;width:38px;white-space:nowrap}
+.ptable .notecell{color:#333}
+.ptable tr.grp td{padding-top:4px}
+.ptable tr.gap td{height:7px;padding:0;border:0}
+.pnone{margin:4px 0 0;font-size:9pt;color:#555;font-style:italic}
+.popen{margin:5px 0 0;font-size:8.5pt;color:#444;border-top:.5pt dotted #999;padding-top:3px}
+
+/* ---------- print ---------- */
+.print-head{display:none}
+@media print{
+  @page{size:portrait;margin:12mm}
+  body{background:#fff;font-size:10pt;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .topbar,.tabs,.searchwrap,.tools,.notice,.legend-screen,#racks{display:none!important}
+  main{padding:0;max-width:none}
+  .print-head{display:block;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:12px}
+  .print-head h2{margin:0;font-size:20pt}
+  .print-head p{margin:2px 0 0;font-size:9pt;color:#333}
+  #printList{display:block}
+  .parea{break-inside:auto;page-break-inside:auto}
+  .parea h3{break-after:avoid;page-break-after:avoid}
+  .ptable thead{display:table-header-group}
+  .ptable tr{break-inside:avoid;page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <h1>Rack Ledger</h1>
+      <span class="site" id="siteName">Warehouse</span>
+    </div>
+    <div class="counts">
+      <div><b id="cStored">0</b><span>pallets stored</span></div>
+      <div><b id="cOpen">0</b><span>bins open</span></div>
+    </div>
+  </div>
+  <div class="searchwrap">
+    <input id="search" type="search" inputmode="search" placeholder="Search job #, shipment #, or bin">
+    <button class="btn-clear" id="searchClear" type="button">Clear</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tabs-inner" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-view="chart">Rack chart</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="add">Put away</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="list">Inventory</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="setup">Setup</button>
+  </div>
+</nav>
+
+<main>
+  <div class="notice" id="storageWarn" hidden>
+    <b>Preview mode.</b> Saving is blocked here, so entries disappear on refresh. Once this file is on your GitHub Pages site, everything saves to the phone or computer that entered it.
+  </div>
+
+  <!-- ============ CHART ============ -->
+  <section class="view" id="view-chart">
+    <div class="print-head">
+      <h2 id="printTitle">Rack Ledger</h2>
+      <p id="printMeta"></p>
+    </div>
+
+    <div class="chart-head">
+      <div>
+        <h2>Rack chart</h2>
+        <p id="chartHint">Tap any bin to see what is in it.</p>
+      </div>
+      <div class="tools">
+        <button class="btn ghost" id="btnPrint" type="button">Print chart</button>
+        <button class="btn safety" id="btnGoAdd" type="button">Put away a pallet</button>
+      </div>
+    </div>
+
+    <div class="legend legend-screen" id="legend"></div>
+    <div id="racks"></div>
+    <div id="printList"></div>
+  </section>
+
+  <!-- ============ ADD ============ -->
+  <section class="view" id="view-add" hidden>
+    <div class="panel">
+      <h2>Put away a pallet</h2>
+      <p class="sub">Fill this in at the rack, before you walk away.</p>
+      <div class="msg" id="addMsg"></div>
+
+      <div class="row">
+        <div class="field">
+          <label for="fJob">Job number</label>
+          <input id="fJob" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="104872">
+          <p class="hint">Six digits.</p>
+        </div>
+        <div class="field">
+          <label for="fShip">Shipment number</label>
+          <input id="fShip" type="text" autocomplete="off" placeholder="SH-4412 or 44120">
+          <p class="hint">Dashes, letters, or plain numbers all work.</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fDesc">Description</label>
+        <select id="fDesc"></select>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="fQty">Pieces or pallets</label>
+          <input id="fQty" type="number" min="1" step="1" value="1">
+        </div>
+        <div class="field">
+          <label for="fOp">Your initials</label>
+          <input id="fOp" type="text" maxlength="4" autocomplete="off" placeholder="JD">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fBin">Bin location</label>
+        <div class="binpick">
+          <select id="fBin"></select>
+          <button class="btn ghost" id="btnNextBin" type="button">Next open</button>
+        </div>
+        <p class="hint" id="binHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="fNotes">Notes</label>
+        <textarea id="fNotes" placeholder="Damaged carton, hold for paint, customer pickup&hellip;"></textarea>
+      </div>
+
+      <div class="actions">
+        <button class="btn safety" id="btnSave" type="button">Store pallet</button>
+        <button class="btn ghost" id="btnReset" type="button">Clear form</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LIST ============ -->
+  <section class="view" id="view-list" hidden>
+    <div class="filterbar">
+      <select id="fltStatus">
+        <option value="stored">In the rack</option>
+        <option value="shipped">Shipped out</option>
+        <option value="all">Everything</option>
+      </select>
+      <select id="fltDesc"><option value="">All descriptions</option></select>
+      <select id="fltSort">
+        <option value="new">Newest first</option>
+        <option value="bin">By bin</option>
+        <option value="job">By job number</option>
+      </select>
+    </div>
+    <div id="items"></div>
+  </section>
+
+  <!-- ============ SETUP ============ -->
+  <section class="view" id="view-setup" hidden>
+    <div class="panel">
+      <h2>Rack layout</h2>
+      <p class="sub">Each aisle is set up on its own, so they can differ in how many racks they hold and how tall they are. Bins count straight through an aisle: in aisle R, R1 is the top bin of the first rack, R4 is the floor bin under it, and R5 starts the top of the next rack.</p>
+      <div class="msg" id="setupMsg"></div>
+
+      <div class="field">
+        <label for="sName">Warehouse or customer name</label>
+        <input id="sName" type="text" placeholder="Shown on the printed sheet">
+      </div>
+
+      <div id="areasBox"></div>
+      <div class="actions">
+        <button class="btn ghost" id="btnAddAisle" type="button">Add rack aisle</button>
+        <button class="btn ghost" id="btnAddFloor" type="button">Add floor zone</button>
+      </div>
+
+      <div class="field" style="margin-top:16px">
+        <label for="sDescs">Description choices</label>
+        <textarea id="sDescs" placeholder="Replacement Door(s), Hardware, HMD, WD, FRP, Misc"></textarea>
+        <p class="hint">Separate with commas. These fill the dropdown on the put-away form.</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn safety" id="btnSaveSetup" type="button">Save layout</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Backup and sharing</h2>
+      <p class="sub">Each phone keeps its own copy. Send a backup file to move the ledger between devices.</p>
+      <div class="actions">
+        <button class="btn ghost" id="btnExport" type="button">Download backup</button>
+        <button class="btn ghost" id="btnCsv" type="button">Download spreadsheet</button>
+        <button class="btn ghost" id="btnImport" type="button">Load a backup</button>
+      </div>
+      <input id="fileImport" type="file" accept="application/json,.json" hidden>
+      <p class="hint">Loading a backup replaces what is on this device.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Start over</h2>
+      <p class="sub">Clears every pallet and the activity log on this device. The rack layout stays.</p>
+      <div class="actions">
+        <button class="btn danger" id="btnWipe" type="button">Erase all pallets</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="binDlg">
+  <div class="dlg-head">
+    <h3 id="dlgTitle">Bin</h3>
+    <button class="x" id="dlgClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="dlg-body" id="dlgBody"></div>
+</dialog>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- storage that survives sandboxes ---------- */
+var mem = {}, storageOK = true;
+try{
+  var probe = "__rl__";
+  window.localStorage.setItem(probe,"1");
+  window.localStorage.removeItem(probe);
+}catch(e){ storageOK = false; }
+
+function readRaw(k){
+  if(storageOK){ try{ return window.localStorage.getItem(k); }catch(e){ storageOK=false; } }
+  return Object.prototype.hasOwnProperty.call(mem,k) ? mem[k] : null;
+}
+function writeRaw(k,v){
+  if(storageOK){ try{ window.localStorage.setItem(k,v); return true; }catch(e){ storageOK=false; } }
+  mem[k]=v; return false;
+}
+
+var KEY = "rackLedger.v2";
+var DEFAULT_DESCS = ["Replacement Door(s)","Hardware","HMD","WD","FRP","Misc"];
+var TINTS = ["#3A6EA5","#C0761A","#6B4E9E","#2F7D5D","#1F8A8C","#7A8794","#A63A6B","#4C7A1F"];
+
+/* An area is either a rack aisle (racks x bins per rack) or a floor zone
+   (one open location that holds as much as gets stacked there). */
+var state = {
+  site:"Receiving",
+  areas:[
+    {name:"R", type:"rack", racks:6, binsPerRack:4},
+    {name:"Floor 1", type:"floor"},
+    {name:"Floor 2", type:"floor"}
+  ],
+  descs:DEFAULT_DESCS.slice(),
+  items:[],
+  log:[],
+  seq:1
+};
+
+function normArea(a){
+  return {
+    name: String(a && a.name != null ? a.name : "?").trim() || "?",
+    type: (a && a.type === "floor") ? "floor" : "rack",
+    racks: Math.min(40, Math.max(1, parseInt(a && a.racks,10) || 6)),
+    binsPerRack: Math.min(12, Math.max(1, parseInt(a && a.binsPerRack,10) || 4))
+  };
+}
+
+/* older saves stored aisles[] with one shared rack/bin count */
+function migrateAreas(d){
+  var areas = [];
+  if(Array.isArray(d.aisles)){
+    d.aisles.forEach(function(n){
+      areas.push({ name:String(n), type:"rack", racks:d.racks||6, binsPerRack:d.binsPerRack||4 });
+    });
+  }
+  if(!areas.length) return state.areas.slice();
+  areas.push({name:"Floor 1", type:"floor"});
+  areas.push({name:"Floor 2", type:"floor"});
+  return areas;
+}
+
+function load(){
+  var raw = readRaw(KEY);
+  if(!raw) return;
+  try{
+    var d = JSON.parse(raw);
+    if(!d || typeof d !== "object") return;
+    if(typeof d.site === "string") state.site = d.site;
+    if(Array.isArray(d.areas) && d.areas.length) state.areas = d.areas.map(normArea);
+    else state.areas = migrateAreas(d).map(normArea);
+    if(Array.isArray(d.descs) && d.descs.length) state.descs = d.descs;
+    if(Array.isArray(d.items)) state.items = d.items;
+    if(Array.isArray(d.log)) state.log = d.log;
+    if(d.seq > 0) state.seq = d.seq;
+  }catch(e){}
+}
+function save(){ writeRaw(KEY, JSON.stringify(state)); }
+
+/* ---------- helpers ---------- */
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s==null?"":s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function pad(n){ return n < 10 ? "0"+n : ""+n; }
+
+/* Bins count straight through an aisle behind the aisle name: the top bin of
+   the first rack is 1, the floor bin under it is 4, the next rack starts at 5. */
+function binId(area,rack,pos){ return area.name + ((rack-1) * area.binsPerRack + pos); }
+function normBin(s){ return String(s==null?"":s).toUpperCase().replace(/[^A-Z0-9]/g,""); }
+
+function areaBins(a){
+  if(a.type === "floor") return [a.name];
+  var out = [];
+  for(var r=1;r<=a.racks;r++) for(var p=1;p<=a.binsPerRack;p++) out.push(binId(a,r,p));
+  return out;
+}
+function allBins(){
+  var out = [];
+  state.areas.forEach(function(a){ out = out.concat(areaBins(a)); });
+  return out;
+}
+function rackBins(){
+  var out = [];
+  state.areas.forEach(function(a){ if(a.type === "rack") out = out.concat(areaBins(a)); });
+  return out;
+}
+function areaOf(bin){
+  for(var i=0;i<state.areas.length;i++){
+    if(areaBins(state.areas[i]).indexOf(bin) > -1) return state.areas[i];
+  }
+  return null;
+}
+function areaLabel(a){ return (a.type === "floor" ? "" : "Aisle ") + a.name; }
+
+function tintFor(desc){
+  var i = state.descs.indexOf(desc);
+  if(i < 0) i = state.descs.length;
+  return TINTS[i % TINTS.length];
+}
+function stored(){ return state.items.filter(function(x){ return x.status === "stored"; }); }
+function inBin(id){ return stored().filter(function(x){ return x.bin === id; }); }
+function byBin(x,y){ return String(x).localeCompare(String(y), undefined, {numeric:true}); }
+
+function fmtDate(iso){
+  var d = new Date(iso);
+  if(isNaN(d)) return "";
+  return (d.getMonth()+1)+"/"+d.getDate()+"/"+String(d.getFullYear()).slice(2)+
+    " "+((d.getHours()%12)||12)+":"+pad(d.getMinutes())+(d.getHours()<12?"am":"pm");
+}
+function note(action, item, extra){
+  state.log.unshift({ ts:new Date().toISOString(), action:action, job:item.job, bin:item.bin, detail:extra||"" });
+  if(state.log.length > 800) state.log.length = 800;
+}
+function flash(el, text, kind){
+  el.textContent = text;
+  el.className = "msg show " + (kind || "ok");
+  window.clearTimeout(el._t);
+  el._t = window.setTimeout(function(){ el.className = "msg"; }, 4200);
+}
+
+var query = "";
+function matches(it){
+  if(!query) return false;
+  var q = query.toLowerCase();
+  var loose = normBin(query);
+  function hit(v){
+    var s = String(v == null ? "" : v);
+    if(s.toLowerCase().indexOf(q) > -1) return true;
+    return loose ? normBin(s).indexOf(loose) > -1 : false;
+  }
+  return hit(it.job) || hit(it.shipment) || hit(it.bin) || hit(it.desc) || hit(it.notes);
+}
+
+function entryHTML(it, ix){
+  return '<span class="entry' + (ix ? " extra" : "") + '">' +
+    '<span class="job">' + esc(it.job || "\u2014") + '</span>' +
+    '<span class="desc">' + esc(it.desc) +
+    (it.shipment ? " \u00b7 " + esc(it.shipment) : "") +
+    (it.qty > 1 ? " \u00b7 " + esc(it.qty) + " pcs" : "") + '</span></span>';
+}
+
+/* ---------- rack chart (screen) ---------- */
+function renderChart(){
+  var occupied = {};
+  stored().forEach(function(it){ (occupied[it.bin] = occupied[it.bin] || []).push(it); });
+  var html = "";
+
+  state.areas.forEach(function(a){
+    if(a.type === "floor"){
+      var fl = occupied[a.name] || [];
+      var fcls = "floorbtn" + (fl.length ? " filled" : "");
+      if(query && fl.length) fcls += fl.some(matches) ? " hit" : " dim";
+      else if(query) fcls += " dim";
+
+      html += '<section class="aisle floorzone"><div class="aisle-head"><h3>' + esc(a.name) + '</h3>' +
+        '<span class="meta">' + (fl.length ? fl.length + " on the floor" : "empty") + '</span></div>' +
+        '<button type="button" class="' + fcls + '" data-bin="' + esc(a.name) + '">';
+      if(!fl.length){
+        html += '<span class="floorempty">Nothing stacked here yet. Tap to add.</span>';
+      }else{
+        html += fl.map(function(it){
+          return '<span class="floorrow" style="border-left-color:' + tintFor(it.desc) + '">' +
+            '<span class="job">' + esc(it.job || "\u2014") + '</span>' +
+            '<span class="desc">' + esc(it.desc) +
+            (it.shipment ? " \u00b7 " + esc(it.shipment) : "") +
+            (it.qty > 1 ? " \u00b7 " + esc(it.qty) + " pcs" : "") + '</span></span>';
+        }).join("");
+      }
+      html += '</button></section>';
+      return;
+    }
+
+    var used = 0, total = a.racks * a.binsPerRack;
+    for(var r0=1;r0<=a.racks;r0++) for(var p0=1;p0<=a.binsPerRack;p0++) if(occupied[binId(a,r0,p0)]) used++;
+
+    html += '<section class="aisle"><div class="aisle-head"><h3>Aisle ' + esc(a.name) + '</h3>' +
+      '<span class="meta">' + used + ' of ' + total + ' bins filled &middot; ' +
+      esc(binId(a,1,1)) + ' to ' + esc(binId(a,a.racks,a.binsPerRack)) + '</span></div>' +
+      '<div class="rack-scroll"><table class="rack"><thead><tr><th class="lvl"></th>';
+    for(var r1=1;r1<=a.racks;r1++) html += '<th class="bay">Rack ' + r1 + '</th>';
+    html += '</tr></thead><tbody>';
+
+    for(var pos=1; pos<=a.binsPerRack; pos++){
+      html += '<tr><th class="lvl">' +
+        (pos === 1 ? "Top" : pos === a.binsPerRack ? "Floor" : "Row " + pos) + '</th>';
+      for(var rk=1; rk<=a.racks; rk++){
+        var id = binId(a,rk,pos);
+        var list = occupied[id] || [];
+        var cls = "bin" + (list.length ? " filled" : "");
+        var style = "";
+        if(list.length){
+          style = ' style="border-left-color:' + tintFor(list[0].desc) + '"';
+          if(query) cls += list.some(matches) ? " hit" : " dim";
+        }else if(query){ cls += " dim"; }
+
+        html += '<td><button type="button" class="' + cls + '"' + style + ' data-bin="' + esc(id) + '">' +
+                '<span class="code">' + esc(id) + '</span>';
+        if(list.length){
+          list.forEach(function(it,ix){ html += entryHTML(it,ix); });
+          if(list.length > 1) html += '<span class="more">+' + (list.length-1) + ' more</span>';
+        }
+        html += '</button></td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div><div class="floorline"></div></section>';
+  });
+
+  $("racks").innerHTML = html;
+  renderPrintList();
+}
+
+/* ---------- printed sheet: line items, grouped by area then bin ---------- */
+function renderPrintList(){
+  var html = "";
+
+  state.areas.forEach(function(a){
+    var bins = areaBins(a), rows = "", open = [], count = 0;
+
+    bins.forEach(function(b){
+      var list = inBin(b).slice().sort(function(x,y){
+        return String(x.job).localeCompare(String(y.job), undefined, {numeric:true});
+      });
+      if(!list.length){ if(a.type === "rack") open.push(b); return; }
+      count += list.length;
+      list.forEach(function(it,ix){
+        rows += '<tr class="' + (ix === 0 ? "grp" : "cont") + '">' +
+          (ix === 0 ? '<td class="bincell" rowspan="' + list.length + '">' + esc(b) + '</td>' : "") +
+          '<td class="jobcell">' + esc(it.job || "\u2014") + '</td>' +
+          '<td>' + esc(it.shipment || "\u2014") + '</td>' +
+          '<td>' + esc(it.desc) + '</td>' +
+          '<td class="num">' + (it.qty > 1 ? esc(it.qty) : "") + '</td>' +
+          '<td class="notecell">' + esc(it.notes || "") + '</td></tr>';
+      });
+      rows += '<tr class="gap"><td colspan="6"></td></tr>';
+    });
+
+    html += '<section class="parea"><h3>' + esc(areaLabel(a)) +
+      '<span class="pcount">' + count + (count === 1 ? " item" : " items") + '</span></h3>';
+
+    if(rows){
+      html += '<table class="ptable"><thead><tr>' +
+        '<th class="bincol">Bin</th><th>Job</th><th>Shipment</th>' +
+        '<th>Description</th><th class="num">Qty</th><th>Notes</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }else{
+      html += '<p class="pnone">Nothing stored here.</p>';
+    }
+    if(open.length){
+      html += '<p class="popen"><b>Open bins:</b> ' + open.map(esc).join(", ") + '</p>';
+    }
+    html += '</section>';
+  });
+
+  $("printList").innerHTML = html;
+}
+
+function renderLegend(){
+  var html = "";
+  state.descs.forEach(function(d){
+    html += '<span><i class="swatch" style="background:' + tintFor(d) + '"></i>' + esc(d) + '</span>';
+  });
+  html += '<span><i class="swatch" style="background:#FBFCFC"></i>Open bin</span>';
+  $("legend").innerHTML = html;
+}
+
+function renderCounts(){
+  var s = stored().length;
+  var open = rackBins().filter(function(id){ return inBin(id).length === 0; }).length;
+  $("cStored").textContent = s;
+  $("cOpen").textContent = open;
+  $("siteName").textContent = state.site;
+  $("printTitle").textContent = state.site + " \u2014 storage sheet";
+  $("printMeta").textContent = "Printed " + fmtDate(new Date().toISOString()) +
+    "  \u00b7  " + s + " stored  \u00b7  " + open + " rack bins open" +
+    (query ? "  \u00b7  filtered by \u201c" + query + "\u201d" : "");
+}
+
+/* ---------- inventory list ---------- */
+function renderList(){
+  var status = $("fltStatus").value;
+  var desc = $("fltDesc").value;
+  var sort = $("fltSort").value;
+
+  var rows = state.items.filter(function(it){
+    if(status !== "all" && it.status !== status) return false;
+    if(desc && it.desc !== desc) return false;
+    if(query && !matches(it)) return false;
+    return true;
+  });
+
+  rows.sort(function(x,y){
+    if(sort === "bin") return byBin(x.bin, y.bin);
+    if(sort === "job") return String(x.job).localeCompare(String(y.job), undefined, {numeric:true});
+    return x.placedAt < y.placedAt ? 1 : -1;
+  });
+
+  var box = $("items");
+  if(!rows.length){
+    box.innerHTML = '<div class="empty"><p>' +
+      (query ? "Nothing matches \u201c" + esc(query) + "\u201d." : "No pallets here yet.") +
+      '</p><button class="btn safety" data-goto="add" type="button">Put away a pallet</button></div>';
+    return;
+  }
+
+  box.innerHTML = rows.map(function(it){
+    return '<article class="item' + (it.status === "shipped" ? " shipped" : "") +
+      '" style="border-left-color:' + tintFor(it.desc) + '">' +
+      '<div class="main"><div class="jobline">Job ' + esc(it.job || "\u2014") +
+      (it.shipment ? '<span class="ship">Shipment ' + esc(it.shipment) + '</span>' : "") + '</div>' +
+      '<div class="sub2">' + esc(it.desc) + (it.qty > 1 ? " \u00b7 " + esc(it.qty) + " pcs" : "") + '</div>' +
+      (it.notes ? '<div class="sub2">' + esc(it.notes) + '</div>' : "") +
+      '<div class="meta2">' + (it.status === "shipped" ? "Shipped " + esc(fmtDate(it.shippedAt)) : "Stored " + esc(fmtDate(it.placedAt))) +
+      (it.operator ? " by " + esc(it.operator) : "") + '</div></div>' +
+      '<button class="binbadge" type="button" data-bin="' + esc(it.bin) + '">' + esc(it.bin) + '</button>' +
+      '</article>';
+  }).join("");
+}
+
+/* ---------- bin dropdowns ---------- */
+function binOptionsHTML(selected){
+  var html = "", floors = [];
+  state.areas.forEach(function(a){
+    if(a.type === "floor"){ floors.push(a); return; }
+    html += '<optgroup label="Aisle ' + esc(a.name) + '">';
+    areaBins(a).forEach(function(id){
+      var n = inBin(id).length;
+      html += '<option value="' + esc(id) + '"' + (id === selected ? " selected" : "") + '>' +
+        esc(id) + (n ? " \u2014 " + n + " here" : " \u2014 open") + '</option>';
+    });
+    html += '</optgroup>';
+  });
+  if(floors.length){
+    html += '<optgroup label="Floor storage">';
+    floors.forEach(function(a){
+      var n = inBin(a.name).length;
+      html += '<option value="' + esc(a.name) + '"' + (a.name === selected ? " selected" : "") + '>' +
+        esc(a.name) + (n ? " \u2014 " + n + " stacked" : " \u2014 empty") + '</option>';
+    });
+    html += '</optgroup>';
+  }
+  return html;
+}
+function renderBinOptions(keep){
+  var sel = $("fBin");
+  var current = keep || sel.value;
+  sel.innerHTML = binOptionsHTML(current);
+  if(current) sel.value = current;
+  if(!sel.value) sel.selectedIndex = 0;
+  updateBinHint();
+}
+function updateBinHint(){
+  var id = $("fBin").value;
+  var a = areaOf(id);
+  var n = inBin(id).length;
+  if(a && a.type === "floor"){
+    $("binHint").textContent = n
+      ? a.name + " holds " + n + " item" + (n>1?"s":"") + ". Everything stacked there stays under this one location."
+      : a.name + " is clear. Use it for bundles with no rack bin.";
+  }else{
+    $("binHint").textContent = n
+      ? id + " already holds " + n + " item" + (n>1?"s":"") + ". Adding here stacks them in the same bin."
+      : id + " is open.";
+  }
+}
+function renderDescOptions(){
+  $("fDesc").innerHTML = state.descs.map(function(d){
+    return '<option value="' + esc(d) + '">' + esc(d) + '</option>';
+  }).join("");
+  $("fltDesc").innerHTML = '<option value="">All descriptions</option>' + state.descs.map(function(d){
+    return '<option value="' + esc(d) + '">' + esc(d) + '</option>';
+  }).join("");
+}
+
+function renderAll(){
+  renderCounts();
+  renderLegend();
+  renderChart();
+  renderList();
+  renderBinOptions();
+}
+
+/* ---------- bin dialog ---------- */
+var dlg = $("binDlg");
+var dlgBin = null;
+var pending = null;
+
+function actionsHTML(it){
+  if(pending && String(pending.id) === String(it.id) && pending.mode === "del"){
+    return '<div class="confirm"><p>Delete this record for good? Ship out instead if the pallet just left the building.</p>' +
+      '<div class="acts">' +
+      '<button class="btn danger" type="button" data-delyes="' + it.id + '">Yes, delete it</button>' +
+      '<button class="btn ghost" type="button" data-cancel="1">Keep it</button>' +
+      '</div></div>';
+  }
+  if(pending && String(pending.id) === String(it.id) && pending.mode === "move"){
+    return '<div class="confirm"><label class="movelabel" for="moveSel">Move to</label>' +
+      '<select id="moveSel">' + binOptionsHTML(it.bin) + '</select>' +
+      '<div class="acts">' +
+      '<button class="btn safety" type="button" data-moveyes="' + it.id + '">Move it here</button>' +
+      '<button class="btn ghost" type="button" data-cancel="1">Cancel</button>' +
+      '</div></div>';
+  }
+  return '<div class="acts">' +
+    '<button class="btn ghost" type="button" data-move="' + it.id + '">Move</button>' +
+    '<button class="btn safety" type="button" data-ship="' + it.id + '">Ship out</button>' +
+    '<button class="btn danger" type="button" data-del="' + it.id + '">Delete</button>' +
+    '</div>';
+}
+
+function openBin(id, keepPending){
+  dlgBin = id;
+  if(!keepPending) pending = null;
+  var list = inBin(id);
+  var a = areaOf(id);
+  $("dlgTitle").textContent = (a && a.type === "floor") ? id : "Bin " + id;
+  if(!list.length){
+    $("dlgBody").innerHTML = '<div class="empty"><p>' + esc(id) + ' is empty.</p>' +
+      '<button class="btn safety" type="button" data-fill="' + esc(id) + '">Put something here</button></div>';
+  }else{
+    $("dlgBody").innerHTML = list.map(function(it){
+      return '<div class="dlg-item" style="border-left-color:' + tintFor(it.desc) + '">' +
+        '<div class="t">Job ' + esc(it.job || "\u2014") + '</div>' +
+        '<div class="d">' + esc(it.desc) + (it.shipment ? " \u00b7 Shipment " + esc(it.shipment) : "") +
+        (it.qty > 1 ? " \u00b7 " + esc(it.qty) + " pcs" : "") + '</div>' +
+        (it.notes ? '<div class="d">' + esc(it.notes) + '</div>' : "") +
+        '<div class="m">Stored ' + esc(fmtDate(it.placedAt)) + (it.operator ? " by " + esc(it.operator) : "") + '</div>' +
+        actionsHTML(it) + '</div>';
+    }).join("");
+  }
+  if(!dlg.open){
+    if(typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open","");
+  }
+}
+function closeDlg(){
+  pending = null;
+  if(typeof dlg.close === "function"){ if(dlg.open) dlg.close(); } else dlg.removeAttribute("open");
+}
+function findItem(id){
+  for(var i=0;i<state.items.length;i++) if(String(state.items[i].id) === String(id)) return state.items[i];
+  return null;
+}
+
+dlg.addEventListener("click", function(e){
+  var t = e.target.closest("button");
+  if(!t) return;
+  var id, it;
+
+  if(t.id === "dlgClose"){ closeDlg(); return; }
+
+  if(t.dataset.fill){
+    closeDlg(); show("add"); renderBinOptions(t.dataset.fill); $("fJob").focus(); return;
+  }
+
+  if((id = t.dataset.ship)){
+    it = findItem(id);
+    if(it){
+      it.status = "shipped";
+      it.shippedAt = new Date().toISOString();
+      note("Shipped out", it);
+      save(); renderAll();
+      if(inBin(dlgBin).length) openBin(dlgBin); else closeDlg();
+    }
+    return;
+  }
+
+  if((id = t.dataset.del)){ pending = {id:id, mode:"del"};  openBin(dlgBin, true); return; }
+  if((id = t.dataset.move)){ pending = {id:id, mode:"move"}; openBin(dlgBin, true); return; }
+  if(t.dataset.cancel){ pending = null; openBin(dlgBin); return; }
+
+  if((id = t.dataset.delyes)){
+    it = findItem(id);
+    if(it){
+      state.items = state.items.filter(function(x){ return String(x.id) !== String(id); });
+      note("Deleted", it);
+      save(); renderAll();
+    }
+    pending = null;
+    if(inBin(dlgBin).length) openBin(dlgBin); else closeDlg();
+    return;
+  }
+
+  if((id = t.dataset.moveyes)){
+    it = findItem(id);
+    var sel = $("moveSel");
+    if(!it || !sel) return;
+    var to = sel.value, from = it.bin;
+    pending = null;
+    if(to === from){ openBin(dlgBin); return; }
+    it.bin = to;
+    note("Moved", it, "from " + from);
+    save(); renderAll(); openBin(to);
+    return;
+  }
+});
+
+/* ---------- tabs ---------- */
+function show(view){
+  var tabs = document.querySelectorAll(".tab");
+  for(var i=0;i<tabs.length;i++) tabs[i].setAttribute("aria-selected", String(tabs[i].dataset.view === view));
+  ["chart","add","list","setup"].forEach(function(v){ $("view-" + v).hidden = (v !== view); });
+  window.scrollTo(0,0);
+}
+document.querySelector(".tabs-inner").addEventListener("click", function(e){
+  var t = e.target.closest(".tab");
+  if(t) show(t.dataset.view);
+});
+document.addEventListener("click", function(e){
+  var b = e.target.closest("[data-bin]");
+  if(b && !e.target.closest("dialog")){ openBin(b.dataset.bin); return; }
+  var g = e.target.closest("[data-goto]");
+  if(g) show(g.dataset.goto);
+});
+
+/* ---------- search ---------- */
+function runSearch(){
+  $("chartHint").textContent = query
+    ? "Showing bins that match \u201c" + query + "\u201d."
+    : "Tap any bin to see what is in it.";
+  renderChart(); renderList(); renderCounts();
+}
+$("search").addEventListener("input", function(){ query = this.value.trim(); runSearch(); });
+$("searchClear").addEventListener("click", function(){ $("search").value = ""; query = ""; runSearch(); });
+
+/* ---------- put away ---------- */
+$("fBin").addEventListener("change", updateBinHint);
+$("btnNextBin").addEventListener("click", function(){
+  var bins = rackBins();
+  for(var i=0;i<bins.length;i++){
+    if(inBin(bins[i]).length === 0){ $("fBin").value = bins[i]; updateBinHint(); return; }
+  }
+  flash($("addMsg"), "Every rack bin is full. Use a floor zone.", "err");
+});
+$("btnSave").addEventListener("click", function(){
+  var job = $("fJob").value.replace(/\D/g,"");
+  var ship = $("fShip").value.trim();
+  if(!job){ flash($("addMsg"), "Enter a job number before storing.", "err"); $("fJob").focus(); return; }
+  if(job.length !== 6){
+    flash($("addMsg"), "Job numbers are six digits. You entered " + job.length + ".", "err");
+    $("fJob").focus(); return;
+  }
+  var it = {
+    id: state.seq++,
+    job: job,
+    shipment: ship,
+    desc: $("fDesc").value,
+    qty: Math.max(1, parseInt($("fQty").value,10) || 1),
+    bin: $("fBin").value,
+    notes: $("fNotes").value.trim(),
+    operator: $("fOp").value.trim().toUpperCase(),
+    placedAt: new Date().toISOString(),
+    status: "stored"
+  };
+  state.items.push(it);
+  note("Stored", it);
+  save();
+
+  /* stay on the bin the operator picked; they choose the next one themselves */
+  var keep = it.bin;
+  renderCounts(); renderLegend(); renderChart(); renderList(); renderBinOptions(keep);
+
+  flash($("addMsg"), "Job " + job + " stored in " + it.bin + ". Bin stays on " + keep + " until you change it.", "ok");
+  $("fJob").value = ""; $("fShip").value = ""; $("fQty").value = "1"; $("fNotes").value = "";
+  $("fJob").focus();
+  if(!storageOK) $("storageWarn").hidden = false;
+});
+$("btnReset").addEventListener("click", function(){
+  $("fJob").value = ""; $("fShip").value = ""; $("fQty").value = "1"; $("fNotes").value = "";
+  $("fDesc").selectedIndex = 0;
+});
+$("btnGoAdd").addEventListener("click", function(){ show("add"); $("fJob").focus(); });
+$("btnPrint").addEventListener("click", function(){ renderCounts(); renderPrintList(); window.print(); });
+
+/* ---------- filters ---------- */
+["fltStatus","fltDesc","fltSort"].forEach(function(id){
+  $(id).addEventListener("change", renderList);
+});
+
+/* ---------- setup: areas ---------- */
+var draft = [];
+
+function nextAisleName(){
+  var used = {}, i;
+  draft.forEach(function(a){ used[a.name.toUpperCase()] = 1; });
+  var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for(i=0;i<letters.length;i++) if(!used[letters[i]]) return letters[i];
+  return "A" + (draft.length + 1);
+}
+function nextFloorName(){
+  var n = 1, used = {};
+  draft.forEach(function(a){ used[a.name.toLowerCase()] = 1; });
+  while(used["floor " + n]) n++;
+  return "Floor " + n;
+}
+
+function renderAreas(){
+  $("areasBox").innerHTML = draft.map(function(a,i){
+    if(a.type === "floor"){
+      return '<div class="arow" data-i="' + i + '">' +
+        '<div class="arow-head"><span class="atype floor">Floor zone</span>' +
+        '<button class="linkbtn" type="button" data-rm="' + i + '">Remove</button></div>' +
+        '<div class="field"><label>Name</label>' +
+        '<input type="text" data-f="name" value="' + esc(a.name) + '"></div>' +
+        '<p class="hint">One open location for bundles on the ground. Holds as much as gets stacked there, and every piece prints out under this name.</p>' +
+        '</div>';
+    }
+    var last = a.name + (a.racks * a.binsPerRack);
+    return '<div class="arow" data-i="' + i + '">' +
+      '<div class="arow-head"><span class="atype">Rack aisle</span>' +
+      '<button class="linkbtn" type="button" data-rm="' + i + '">Remove</button></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Name</label>' +
+        '<input type="text" data-f="name" value="' + esc(a.name) + '"></div>' +
+        '<div class="field"><label>Racks</label>' +
+        '<input type="number" min="1" max="40" data-f="racks" value="' + esc(a.racks) + '"></div>' +
+        '<div class="field"><label>Bins per rack</label>' +
+        '<input type="number" min="1" max="12" data-f="binsPerRack" value="' + esc(a.binsPerRack) + '"></div>' +
+      '</div>' +
+      '<p class="hint">Bins ' + esc(a.name) + '1 through ' + esc(last) + '.</p>' +
+      '</div>';
+  }).join("");
+}
+
+$("areasBox").addEventListener("input", function(e){
+  var inp = e.target;
+  if(!inp.dataset.f) return;
+  var row = inp.closest(".arow");
+  if(!row) return;
+  var i = parseInt(row.dataset.i,10);
+  var f = inp.dataset.f;
+  if(f === "name") draft[i].name = inp.value;
+  else draft[i][f] = parseInt(inp.value,10) || 1;
+
+  var hint = row.querySelector(".hint");
+  if(hint && draft[i].type === "rack"){
+    var nm = draft[i].name || "?";
+    hint.textContent = "Bins " + nm + "1 through " + nm + (draft[i].racks * draft[i].binsPerRack) + ".";
+  }
+});
+$("areasBox").addEventListener("click", function(e){
+  var b = e.target.closest("[data-rm]");
+  if(!b) return;
+  draft.splice(parseInt(b.dataset.rm,10), 1);
+  renderAreas();
+});
+$("btnAddAisle").addEventListener("click", function(){
+  draft.push({name:nextAisleName(), type:"rack", racks:6, binsPerRack:4});
+  renderAreas();
+});
+$("btnAddFloor").addEventListener("click", function(){
+  draft.push({name:nextFloorName(), type:"floor", racks:6, binsPerRack:4});
+  renderAreas();
+});
+
+function fillSetup(){
+  $("sName").value = state.site;
+  $("sDescs").value = state.descs.join(", ");
+  draft = state.areas.map(function(a){ return normArea(a); });
+  renderAreas();
+}
+
+$("btnSaveSetup").addEventListener("click", function(){
+  var descs = $("sDescs").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+  if(!draft.length){ flash($("setupMsg"), "Add at least one aisle or floor zone.", "err"); return; }
+  if(!descs.length){ flash($("setupMsg"), "Keep at least one description choice.", "err"); return; }
+
+  var seen = {}, bad = null;
+  var cleaned = draft.map(function(a){
+    var n = normArea(a);
+    if(!String(a.name).trim()) bad = bad || "Every aisle and floor zone needs a name.";
+    if(seen[n.name.toUpperCase()]) bad = bad || "Two areas are both named " + n.name + ". Names must be different.";
+    seen[n.name.toUpperCase()] = 1;
+    return n;
+  });
+  if(bad){ flash($("setupMsg"), bad, "err"); return; }
+
+  state.site = $("sName").value.trim() || "Warehouse";
+  state.areas = cleaned;
+  state.descs = descs;
+
+  var live = allBins();
+  var orphans = stored().filter(function(it){ return live.indexOf(it.bin) === -1; });
+  save();
+  fillSetup(); renderDescOptions(); renderAll();
+  flash($("setupMsg"), orphans.length
+    ? "Layout saved. " + orphans.length + " item" + (orphans.length>1?"s are":" is") +
+      " sitting in a bin that no longer exists \u2014 find them under Inventory and move them."
+    : "Layout saved.", orphans.length ? "err" : "ok");
+});
+
+/* ---------- backup ---------- */
+function download(name, text, type){
+  var blob = new Blob([text], {type:type});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+function stamp(){
+  var d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+}
+$("btnExport").addEventListener("click", function(){
+  download("rack-ledger-" + stamp() + ".json", JSON.stringify(state,null,2), "application/json");
+});
+$("btnCsv").addEventListener("click", function(){
+  var head = ["Bin","Job","Shipment","Description","Qty","Status","Stored","Shipped","Operator","Notes"];
+  var lines = [head.join(",")];
+  state.items.slice().sort(function(x,y){ return byBin(x.bin,y.bin); }).forEach(function(it){
+    lines.push([it.bin,it.job,it.shipment,it.desc,it.qty,it.status,fmtDate(it.placedAt),
+      it.shippedAt?fmtDate(it.shippedAt):"",it.operator,it.notes]
+      .map(function(v){ return '"' + String(v==null?"":v).replace(/"/g,'""') + '"'; }).join(","));
+  });
+  download("rack-ledger-" + stamp() + ".csv", lines.join("\r\n"), "text/csv");
+});
+$("btnImport").addEventListener("click", function(){ $("fileImport").click(); });
+$("fileImport").addEventListener("change", function(){
+  var f = this.files && this.files[0];
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var d = JSON.parse(r.result);
+      if(!d || !Array.isArray(d.items)) throw new Error("bad file");
+      state = {
+        site: d.site || "Warehouse",
+        areas: (Array.isArray(d.areas) && d.areas.length) ? d.areas.map(normArea) : migrateAreas(d).map(normArea),
+        descs: (Array.isArray(d.descs) && d.descs.length) ? d.descs : DEFAULT_DESCS.slice(),
+        items: d.items,
+        log: Array.isArray(d.log) ? d.log : [],
+        seq: d.seq || (d.items.length + 1)
+      };
+      save(); fillSetup(); renderDescOptions(); renderAll();
+      flash($("setupMsg"), "Backup loaded. " + state.items.length + " records restored.", "ok");
+    }catch(err){
+      flash($("setupMsg"), "That file is not a Rack Ledger backup.", "err");
+    }
+  };
+  r.readAsText(f);
+  this.value = "";
+});
+
+var wipeArmed = false, wipeTimer = null;
+$("btnWipe").addEventListener("click", function(){
+  var b = this;
+  if(!wipeArmed){
+    wipeArmed = true;
+    b.textContent = "Tap again to erase " + state.items.length + " record" + (state.items.length === 1 ? "" : "s");
+    flash($("setupMsg"), "Download a backup first if you might need this data.", "err");
+    window.clearTimeout(wipeTimer);
+    wipeTimer = window.setTimeout(function(){ wipeArmed = false; b.textContent = "Erase all pallets"; }, 6000);
+    return;
+  }
+  window.clearTimeout(wipeTimer);
+  wipeArmed = false;
+  b.textContent = "Erase all pallets";
+  state.items = []; state.log = []; state.seq = 1;
+  save(); renderAll();
+  flash($("setupMsg"), "All pallet records erased.", "ok");
+});
+
+/* ---------- go ---------- */
+load();
+if(!storageOK) $("storageWarn").hidden = false;
+fillSetup();
+renderDescOptions();
+renderAll();
+show("chart");
+})();
+</script>
+</body>
+</html>
